@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Hotel_Listing.api.Data;
 using Hotel_Listing.api.Models;
+using Hotel_Listing.api.Contracts;
+using AutoMapper;
+using Hotel_Listing.api.Dtos.Hotel;
 
 namespace Hotel_Listing.api.Controllers
 {
@@ -14,53 +17,58 @@ namespace Hotel_Listing.api.Controllers
     [ApiController]
     public class HotelsController : ControllerBase
     {
-        private readonly HotelListingDbContext _context;
+        private readonly IHotelRepo _hotel;
+        private readonly IMapper _mapper;
 
-        public HotelsController(HotelListingDbContext context)
+        public HotelsController(IHotelRepo hotel, IMapper mapper)
         {
-            _context = context;
+            _hotel = hotel;
+            _mapper = mapper;
         }
 
         // GET: api/Hotels
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Hotel>>> GetHotels()
+        public async Task<ActionResult<IEnumerable<HotelDto>>> GetHotels()
         {
-            return await _context.Hotels.ToListAsync();
+            var hotels = await _hotel.GetAllAsync();
+            return Ok(_mapper.Map<List<HotelDto>>(hotels));
         }
 
         // GET: api/Hotels/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Hotel>> GetHotel(int id)
+        public async Task<ActionResult<HotelDto>> GetHotel(int id)
         {
-            var hotel = await _context.Hotels.FindAsync(id);
-
+            var hotel = await _hotel.GetAsync(id);
             if (hotel == null)
             {
                 return NotFound();
             }
-
-            return hotel;
+             return Ok(_mapper.Map<HotelDto>(hotel));
         }
 
         // PUT: api/Hotels/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutHotel(int id, Hotel hotel)
+        public async Task<IActionResult> PutHotel(int id, HotelDto hotelDto)
         {
-            if (id != hotel.Id)
+            if (id != hotelDto.Id)
             {
                 return BadRequest();
             }
 
-            _context.Entry(hotel).State = EntityState.Modified;
-
+            var hotel = await _hotel.GetAsync(id);
+            if (hotel == null)
+            {
+                return NotFound();
+            }
+            _mapper.Map(hotelDto, hotel);
             try
             {
-                await _context.SaveChangesAsync();
+                await _hotel.UpdateAsync(hotel);
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!HotelExists(id))
+                if (! await HotelExists(id))
                 {
                     return NotFound();
                 }
@@ -69,40 +77,37 @@ namespace Hotel_Listing.api.Controllers
                     throw;
                 }
             }
-
             return NoContent();
         }
 
         // POST: api/Hotels
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Hotel>> PostHotel(Hotel hotel)
+        public async Task<ActionResult<Hotel>> PostHotel(CreateHotelDto hotelDto)
         {
-            _context.Hotels.Add(hotel);
-            await _context.SaveChangesAsync();
+            var hotel = _mapper.Map<Hotel>(hotelDto);
+            await _hotel.AddAsync(hotel);
 
             return CreatedAtAction("GetHotel", new { id = hotel.Id }, hotel);
         }
-
+            
         // DELETE: api/Hotels/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteHotel(int id)
         {
-            var hotel = await _context.Hotels.FindAsync(id);
+            var hotel = await _hotel.GetAsync(id);
             if (hotel == null)
             {
                 return NotFound();
             }
 
-            _context.Hotels.Remove(hotel);
-            await _context.SaveChangesAsync();
-
+            await _hotel.DeleteAsync(id);
             return NoContent();
         }
 
-        private bool HotelExists(int id)
+        private async Task<bool> HotelExists(int id)
         {
-            return _context.Hotels.Any(e => e.Id == id);
+            return await _hotel.Exist(id);
         }
     }
 }
