@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Hotel_Listing.api.Data;
 using Hotel_Listing.api.Models;
+using AutoMapper;
+using Hotel_Listing.api.Dtos.Country;
+using Hotel_Listing.api.Contracts;
 
 namespace Hotel_Listing.api.Controllers
 {
@@ -14,53 +17,62 @@ namespace Hotel_Listing.api.Controllers
     [ApiController]
     public class CountriesController : ControllerBase
     {
-        private readonly HotelListingDbContext _context;
-
-        public CountriesController(HotelListingDbContext context)
+        private readonly ICountryRepo _contry;
+        private readonly IMapper _mapper;
+        public CountriesController(IMapper mapper, ICountryRepo contry)
         {
-            _context = context;
+            _mapper = mapper;
+            _contry = contry;
         }
 
         // GET: api/Countries
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Country>>> GetCountries()
+        public async Task<ActionResult<IEnumerable<GetCountryDto>>> GetCountries()
         {
-            return await _context.Countries.ToListAsync();
+            var countries = await _contry.GetAllAsync();
+            var records = _mapper.Map<List<GetCountryDto>>(countries);
+            return Ok(records);
         }
 
         // GET: api/Countries/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Country>> GetCountry(int id)
+        public async Task<ActionResult<CountryDto>> GetCountry(int id)
         {
-            var country = await _context.Countries.FindAsync(id);
-
-            if (country == null)
+            var country = await _contry.GetDetails(id);
+            if (country == null) 
             {
                 return NotFound();
             }
+              
+            var response = _mapper.Map<CountryDto>(country);
 
-            return country;
+            return response;
         }
 
         // PUT: api/Countries/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutCountry(int id, Country country)
+        public async Task<IActionResult> PutCountry(int id, UpdateCountryDto updateCountry)
         {
-            if (id != country.Id)
+            if (id != updateCountry.Id)
             {
                 return BadRequest("Invalid Record ID");
             }
 
-            _context.Entry(country).State = EntityState.Modified;
+            var country = await _contry.GetAsync(id);
+            if (country == null)
+            {
+                return NotFound();
+            }
+            _mapper.Map(updateCountry, country);
 
             try
             {
-                await _context.SaveChangesAsync();
+                await _contry.UpdateAsync(country);
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!CountryExists(id))
+                if (!await CountryExists(id))
                 {
                     return NotFound();
                 }
@@ -76,10 +88,11 @@ namespace Hotel_Listing.api.Controllers
         // POST: api/Countries
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Country>> PostCountry(Country country)
+        public async Task<ActionResult<Country>> PostCountry(CreateCountryDto countryDto)
         {
-            _context.Countries.Add(country);
-            await _context.SaveChangesAsync();
+            var country = _mapper.Map<Country>(countryDto);
+
+            await _contry.AddAsync(country);
 
             return CreatedAtAction("GetCountry", new { id = country.Id }, country);
         }
@@ -88,21 +101,20 @@ namespace Hotel_Listing.api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCountry(int id)
         {
-            var country = await _context.Countries.FindAsync(id);
+            var country = await _contry.GetAsync(id);
             if (country == null)
             {
                 return NotFound();
             }
 
-            _context.Countries.Remove(country);
-            await _context.SaveChangesAsync();
+            await _contry.DeleteAsync(id);
 
             return NoContent();
         }
 
-        private bool CountryExists(int id)
+        private Task<bool> CountryExists(int id)
         {
-            return _context.Countries.Any(e => e.Id == id);
+            return _contry.Exist(id);
         }
     }
 }
