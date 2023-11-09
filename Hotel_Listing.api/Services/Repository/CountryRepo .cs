@@ -1,9 +1,9 @@
-﻿using Hotel_Listing.api.Contracts;
-using Hotel_Listing.api.Data;
+﻿using Hotel_Listing.api.Data;
 using Hotel_Listing.api.Models;
+using Hotel_Listing.api.Services.Contracts;
 using Microsoft.EntityFrameworkCore;
 
-namespace Hotel_Listing.api.Repository
+namespace Hotel_Listing.api.Services.Repository
 {
     public class CountryRepo : GenericRepository<Country>, ICountryRepo
     {
@@ -11,7 +11,7 @@ namespace Hotel_Listing.api.Repository
 
         public CountryRepo(HotelListingDbContext context) : base(context)
         {
-            this._context = context;
+            _context = context;
         }
 
         public async Task<Country> GetDetails(int id)

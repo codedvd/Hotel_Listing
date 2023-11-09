@@ -1,9 +1,9 @@
 ﻿using AutoMapper;
-using Hotel_Listing.api.Contracts;
 using Hotel_Listing.api.Data;
+using Hotel_Listing.api.Services.Contracts;
 using Microsoft.EntityFrameworkCore;
 
-namespace Hotel_Listing.api.Repository
+namespace Hotel_Listing.api.Services.Repository
 {
     public class GenericRepository<T> : IGenericRepository<T> where T : class
     {
@@ -14,9 +14,9 @@ namespace Hotel_Listing.api.Repository
         }
         public async Task<T> AddAsync(T entity)
         {
-           await _context.AddAsync(entity);
-           await _context.SaveChangesAsync();
-           return entity;
+            await _context.AddAsync(entity);
+            await _context.SaveChangesAsync();
+            return entity;
         }
 
         public async Task DeleteAsync(int id)
@@ -34,8 +34,8 @@ namespace Hotel_Listing.api.Repository
 
         public async Task<List<T>> GetAllAsync()
         {
-           return await _context.Set<T>().ToListAsync();
-        }   
+            return await _context.Set<T>().ToListAsync();
+        }
 
         public async Task<T> GetAsync(int? id)
         {

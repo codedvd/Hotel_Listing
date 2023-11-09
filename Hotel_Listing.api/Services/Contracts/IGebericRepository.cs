@@ -1,4 +1,4 @@
-﻿namespace Hotel_Listing.api.Contracts
+﻿namespace Hotel_Listing.api.Services.Contracts
 {
     public interface IGenericRepository<T> where T : class
     {

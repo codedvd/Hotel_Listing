@@ -7,9 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Hotel_Listing.api.Data;
 using Hotel_Listing.api.Models;
-using Hotel_Listing.api.Contracts;
 using AutoMapper;
 using Hotel_Listing.api.Dtos.Hotel;
+using Hotel_Listing.api.Services.Contracts;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Hotel_Listing.api.Controllers
 {
@@ -36,6 +37,7 @@ namespace Hotel_Listing.api.Controllers
 
         // GET: api/Hotels/5
         [HttpGet("{id}")]
+        [Authorize]
         public async Task<ActionResult<HotelDto>> GetHotel(int id)
         {
             var hotel = await _hotel.GetAsync(id);
@@ -49,6 +51,7 @@ namespace Hotel_Listing.api.Controllers
         // PUT: api/Hotels/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
+        [Authorize]
         public async Task<IActionResult> PutHotel(int id, HotelDto hotelDto)
         {
             if (id != hotelDto.Id)
@@ -83,6 +86,7 @@ namespace Hotel_Listing.api.Controllers
         // POST: api/Hotels
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
+        [Authorize]
         public async Task<ActionResult<Hotel>> PostHotel(CreateHotelDto hotelDto)
         {
             var hotel = _mapper.Map<Hotel>(hotelDto);
@@ -93,6 +97,7 @@ namespace Hotel_Listing.api.Controllers
             
         // DELETE: api/Hotels/5
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Administrator")]
         public async Task<IActionResult> DeleteHotel(int id)
         {
             var hotel = await _hotel.GetAsync(id);
