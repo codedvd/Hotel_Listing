@@ -1,5 +1,6 @@
 using Hotel_Listing.api.Configurations;
 using Hotel_Listing.api.Data;
+using Hotel_Listing.api.Middlewares;
 using Hotel_Listing.api.Models;
 using Hotel_Listing.api.Services.Contracts;
 using Hotel_Listing.api.Services.Repository;
@@ -9,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using System.Text;
+using Microsoft.AspNetCore.Mvc.Versioning;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +43,27 @@ builder.Services.AddCors(options => {
             .AllowAnyMethod());
 });
 
+//Registering Api Versioning
+builder.Services.AddApiVersioning(options => 
+{
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.DefaultApiVersion = new Microsoft.AspNetCore.Mvc.ApiVersion(1, 0);
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new QueryStringApiVersionReader("api-version"),
+        new HeaderApiVersionReader("X-Version"),
+        new MediaTypeApiVersionReader("ver")
+        );
+});
+
+builder.Services.AddVersionedApiExplorer(
+    options =>
+    {
+        options.GroupNameFormat = "'v'VVV";
+        options.SubstituteApiVersionInUrl = true;
+    }
+);
+
 //SeriLog Configuration.
 builder.Host.UseSerilog((ctx, lc) => lc.WriteTo.Console().ReadFrom.Configuration(ctx.Configuration));
 
@@ -70,6 +93,13 @@ builder.Services.AddAuthentication(options => {
     };
 });
 
+//Configure Response Cacheing
+builder.Services.AddResponseCaching(options =>
+{
+    options.MaximumBodySize = 1024;
+    options.UseCaseSensitivePaths = true;
+});
+
 var app = builder.Build();
  
 // Configure the HTTP request pipeline.
@@ -79,6 +109,9 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
     app.UseSwaggerUI();
 }
 
+//Adding the middleware for Exceptoin in the pipeline
+app.UseMiddleware<ExceptionMiddleware>();
+
 //Adding Serilog to the pipeline
 app.UseSerilogRequestLogging();
 
@@ -86,6 +119,23 @@ app.UseHttpsRedirection();
 
 //Adding Cors to the pipeline
 app.UseCors("AllowAll");
+
+//Adding Cacheing
+app.UseResponseCaching();
+
+app.Use(async (context, next) =>
+{
+    context.Response.GetTypedHeaders().CacheControl =
+    new Microsoft.Net.Http.Headers.CacheControlHeaderValue()
+    {
+        Public = true,
+        MaxAge = TimeSpan.FromSeconds(10)
+    };
+    context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.Vary] =
+    new string[] { "Accept-Encoding" };
+
+    await next();
+});
 
 app.UseAuthentication(); 
 app.UseAuthorization();

@@ -17,13 +17,13 @@ namespace Hotel_Listing.api.Controllers
 {
     [Route("api/v{version:apiVersion}/countries")]
     [ApiController]
-    [ApiVersion("1.0", Deprecated = true)]
-    public class CountriesController : ControllerBase
+    [ApiVersion("2.0")]
+    public class CountriesV2Controller : ControllerBase
     {
         private readonly ICountryRepo _contry;
         private readonly ILogger _logger;
         private readonly IMapper _mapper;
-        public CountriesController(IMapper mapper, ICountryRepo contry, ILogger<CountriesController> logger)
+        public CountriesV2Controller(IMapper mapper, ICountryRepo contry, ILogger<CountriesV2Controller> logger)
         {
             _mapper = mapper;
             _contry = contry;

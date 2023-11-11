@@ -15,14 +15,18 @@ namespace Hotel_Listing.api.Services.Repository
         private readonly IMapper _mapper;
         private readonly UserManager<ApiUser> _userManager;
         private readonly IConfiguration _configuration;
+        private readonly ILogger _logger;
+
         private ApiUser _user;
         private const string _loginProvider = "HotelListingApi";
         private const string _refreshToken = "RefreshToken";
-        public AuthManager(IMapper mapper, UserManager<ApiUser> userManager, IConfiguration configuration)
+
+        public AuthManager(IMapper mapper, UserManager<ApiUser> userManager, IConfiguration configuration, ILogger<AuthManager> logger)
         {
             this._mapper = mapper;
             this._userManager = userManager;
             this._configuration = configuration;
+            this._logger = logger;
         }
 
         public async Task<string> CreateRefreshToken()
@@ -31,19 +35,22 @@ namespace Hotel_Listing.api.Services.Repository
 
             var newRefreshToken = await _userManager.GenerateUserTokenAsync(_user, _loginProvider, _refreshToken);
 
-            var result = await _userManager.SetAuthenticationTokenAsync(_user, _loginProvider, _refreshToken, newRefreshToken);
+            await _userManager.SetAuthenticationTokenAsync(_user, _loginProvider, _refreshToken, newRefreshToken);
 
             return newRefreshToken;
         }
 
         public async Task<AuthResponseDto> Login(LoginDto loginDto)
         {
+            _logger.LogInformation($"Looking for user with email {loginDto.Email}");
             _user = await _userManager.FindByEmailAsync(loginDto.Email);
             bool isValidUser = await _userManager.CheckPasswordAsync(_user, loginDto.Password);
 
             if (_user == null || isValidUser == false) return null;
 
             var token = await GenerateToken();
+            _logger.LogInformation($"Token genrated for user with email: {loginDto.Email} | Token: {token}");
+
             return new AuthResponseDto
             {
                 Token = token,
