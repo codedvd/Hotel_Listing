@@ -171,14 +171,44 @@ app.MapHealthChecks("/healthcheck", new HealthCheckOptions
     },
     ResponseWriter = WriteResponse
 });
-
+//--Extention of creating a custom health checks..
 static Task WriteResponse(HttpContext context, HealthReport report)
 {
     context.Response.ContentType = "application/json; charset=utf-8";
 
     var options = new JsonWriterOptions {Indented = true};
+
     using var memoryStream = new MemoryStream();
-    using(var jsonwr)
+    using (var jsonWriter = new Utf8JsonWriter(memoryStream, options))
+    {
+        jsonWriter.WriteStartObject();
+        jsonWriter.WriteString("status", report.Status.ToString());
+        jsonWriter.WriteStartObject("results");
+
+        foreach(var healthRepositoryEntry in report.Entries)
+        {
+            jsonWriter.WriteStartObject(healthRepositoryEntry.Key);
+            jsonWriter.WriteString("status", healthRepositoryEntry.Value.Status.ToString());
+            jsonWriter.WriteString("description", healthRepositoryEntry.Value.Description);
+            jsonWriter.WriteStartObject("data");
+
+            foreach(var item in healthRepositoryEntry.Value.Data)
+            {
+                jsonWriter.WritePropertyName(item.Key);
+
+                System.Text.Json.JsonSerializer.Serialize(jsonWriter, item.Value, 
+                    item.Value?.GetType() ?? typeof(object));
+            }
+
+            jsonWriter.WriteEndObject();
+            jsonWriter.WriteEndObject();
+        }
+
+        jsonWriter.WriteEndObject();
+        jsonWriter.WriteEndObject();
+    }
+    return context.Response.WriteAsync(
+        Encoding.UTF8.GetString(memoryStream.ToArray()));
 }
 
 app.MapHealthChecks("/health"); //Run all default check
