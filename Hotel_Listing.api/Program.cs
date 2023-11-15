@@ -17,15 +17,16 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Newtonsoft.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-var conn = builder.Configuration.GetConnectionString("HotelListingDB");
+var connection = builder.Configuration.GetConnectionString("HotelListingDB");
 builder.Services.AddDbContext<HotelListingDbContext>(options =>
 {
-    options.UseSqlServer(conn);
+    options.UseSqlServer(connection);
 });
 
 //Configuring Identity Core
@@ -136,9 +137,14 @@ builder.Services.AddResponseCaching(options =>
     options.UseCaseSensitivePaths = true;
 });
 
-//Adding Health Checks to the Controllers
+//Adding Health Checks to the Controllers  -- AspNetCore.HealthChecks.SqlServer 
+//EFCore - Microsoft.Extensions.Diagnostics.HealthChecks.EntityFramworkCore
 builder.Services.AddHealthChecks()
-    .AddCheck<CustomHealthChecks>("CustomHealthCheck", failureStatus: HealthStatus.Degraded, tags: new[]{ "custom" });
+    .AddCheck<CustomHealthChecks>("CustomHealthCheck", 
+        failureStatus: HealthStatus.Degraded, 
+        tags: new[]{ "custom" }
+        ).AddSqlServer(connection, tags: new[] { "database" }) //Database is healthy
+        .AddDbContextCheck<HotelListingDbContext>(tags: new[] { "database" }); //Checking that the we can connect to the Db
 
 //Configuring OData to #AddControllers
 builder.Services.AddControllers().AddOData(options =>
@@ -171,7 +177,32 @@ app.MapHealthChecks("/healthcheck", new HealthCheckOptions
     },
     ResponseWriter = WriteResponse
 });
-//--Extention of creating a custom health checks..
+
+//Database Health Checks
+app.MapHealthChecks("/databasehealthcheck", new HealthCheckOptions
+{
+    Predicate = healthcheck => healthcheck.Tags.Contains("database"),    //Run checks for database
+    ResultStatusCodes =
+    {
+        [HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
+    },
+    ResponseWriter = WriteResponse
+});
+
+//A Base Health Checker
+app.MapHealthChecks("/healthz", new HealthCheckOptions
+{
+    ResultStatusCodes =
+    {
+        [HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
+    },
+    ResponseWriter = WriteResponse
+});
+//--Extention of creating a custom health checks.. Handdy when you have multiple health checks
 static Task WriteResponse(HttpContext context, HealthReport report)
 {
     context.Response.ContentType = "application/json; charset=utf-8";
