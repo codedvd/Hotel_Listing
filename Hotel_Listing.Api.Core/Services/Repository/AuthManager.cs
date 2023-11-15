@@ -3,6 +3,8 @@ using Hotel_Listing.api.Dtos.Users;
 using Hotel_Listing.api.Models;
 using Hotel_Listing.api.Services.Contracts;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -17,7 +19,7 @@ namespace Hotel_Listing.api.Services.Repository
         private readonly IConfiguration _configuration;
         private readonly ILogger _logger;
 
-        private ApiUser _user;
+        private ApiUser? _user;
         private const string _loginProvider = "HotelListingApi";
         private const string _refreshToken = "RefreshToken";
 
@@ -36,7 +38,7 @@ namespace Hotel_Listing.api.Services.Repository
             var newRefreshToken = await _userManager.GenerateUserTokenAsync(_user, _loginProvider, _refreshToken);
 
             await _userManager.SetAuthenticationTokenAsync(_user, _loginProvider, _refreshToken, newRefreshToken);
-
+             
             return newRefreshToken;
         }
 
@@ -46,7 +48,7 @@ namespace Hotel_Listing.api.Services.Repository
             _user = await _userManager.FindByEmailAsync(loginDto.Email);
             bool isValidUser = await _userManager.CheckPasswordAsync(_user, loginDto.Password);
 
-            if (_user == null || isValidUser == false) return null;
+            if (_user == null || !isValidUser) return null;
 
             var token = await GenerateToken();
             _logger.LogInformation($"Token genrated for user with email: {loginDto.Email} | Token: {token}");

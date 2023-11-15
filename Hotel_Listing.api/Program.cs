@@ -11,6 +11,12 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using System.Text;
 using Microsoft.AspNetCore.Mvc.Versioning;
+using Microsoft.AspNetCore.OData;
+using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Newtonsoft.Json;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,11 +36,41 @@ builder.Services.AddIdentityCore<ApiUser>()
     .AddDefaultTokenProviders();
 
 
-builder.Services.AddControllers();
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+//Configuring API Security, Authorization
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Hotel Lising Api", Version = "v1" });
+    options.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, new OpenApiSecurityScheme
+    {
+       Description = @"JWT Authorization header using the Bearer scheme. 
+                     Enter 'Bearer' [space] and then your token in the text below.
+                     Example: 'Bearer 123456767ef'",
+       Name = "Authorization",
+       In = ParameterLocation.Header,
+       Type = SecuritySchemeType.ApiKey,
+       Scheme = JwtBearerDefaults.AuthenticationScheme
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = JwtBearerDefaults.AuthenticationScheme
+                },
+                Scheme = "0auth2",
+                Name = JwtBearerDefaults.AuthenticationScheme,
+                In = ParameterLocation.Header
+            },
+            new List<string>()
+        }
+    });
+}); 
 
 builder.Services.AddCors(options => {
     options.AddPolicy("AllowAll", 
@@ -100,6 +136,17 @@ builder.Services.AddResponseCaching(options =>
     options.UseCaseSensitivePaths = true;
 });
 
+//Adding Health Checks to the Controllers
+builder.Services.AddHealthChecks()
+    .AddCheck<CustomHealthChecks>("CustomHealthCheck", failureStatus: HealthStatus.Degraded, tags: new[]{ "custom" });
+
+//Configuring OData to #AddControllers
+builder.Services.AddControllers().AddOData(options =>
+{
+    options.Select().Filter().OrderBy();
+});
+
+
 var app = builder.Build();
  
 // Configure the HTTP request pipeline.
@@ -111,6 +158,31 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 
 //Adding the middleware for Exceptoin in the pipeline
 app.UseMiddleware<ExceptionMiddleware>();
+
+//Middleware for health checks
+app.MapHealthChecks("/healthcheck", new HealthCheckOptions
+{
+    Predicate = healthcheck => healthcheck.Tags.Contains("custom"),    //Run checks with custom tags
+    ResultStatusCodes =
+    {
+        [HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
+    },
+    ResponseWriter = WriteResponse
+});
+
+static Task WriteResponse(HttpContext context, HealthReport report)
+{
+    context.Response.ContentType = "application/json; charset=utf-8";
+
+    var options = new JsonWriterOptions {Indented = true};
+    using var memoryStream = new MemoryStream();
+    using(var jsonwr)
+}
+
+app.MapHealthChecks("/health"); //Run all default check
+
 
 //Adding Serilog to the pipeline
 app.UseSerilogRequestLogging();
@@ -143,3 +215,18 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+class CustomHealthChecks : IHealthCheck
+{
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        var isHealthy = true;
+        /*customs checks... Logic.... etc */
+
+        if (isHealthy)
+        {
+            return Task.FromResult(HealthCheckResult.Healthy("All Systems are looking good"));
+        }
+        return Task.FromResult(new HealthCheckResult(context.Registration.FailureStatus, "System Unhealthy"));
+    }
+}

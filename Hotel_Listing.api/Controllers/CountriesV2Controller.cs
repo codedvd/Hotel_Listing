@@ -12,6 +12,7 @@ using Hotel_Listing.api.Dtos.Country;
 using Hotel_Listing.api.Services.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Hotel_Listing.api.Exceptions;
+using Microsoft.AspNetCore.OData.Query;
 
 namespace Hotel_Listing.api.Controllers
 {
@@ -32,6 +33,7 @@ namespace Hotel_Listing.api.Controllers
 
         // GET: api/Countries
         [HttpGet]
+        [EnableQuery] 
         public async Task<ActionResult<IEnumerable<GetCountryDto>>> GetCountries()
         {
             var countries = await _contry.GetAllAsync();
